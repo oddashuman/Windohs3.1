@@ -2,256 +2,69 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 
 /// <summary>
-/// CLEAN Windows 3.1 Desktop Manager - WHITE SCREEN FIXED
-/// Simplified, conflict-free desktop creation
+/// **Complete Code: Windows31DesktopManager**
+/// Vision: The master script for creating and managing a stable, authentic, and
+/// story-aware Windows 3.1 desktop environment. It handles the boot sequence,
+/// icon and window management, audio integration, and launching all of Orion's
+/// interactive programs (FileManager, Notepad, Solitaire, SystemMonitor).
 /// </summary>
 public class Windows31DesktopManager : MonoBehaviour
 {
     public static Windows31DesktopManager Instance { get; private set; }
 
-    [Header("Desktop Settings")]
-    public Color desktopColor = new Color32(0, 128, 128, 255); // Teal
-    public bool skipBootOnRestart = true;
-    public bool debugMode = true;
+    public enum DesktopActivity { Idle, OrganizingFiles, ReviewingNotes, SystemMaintenance, Playing, Researching, WaitingForConnection, InConversation }
+    public enum ProgramType { FileManager, Notepad, SystemMonitor, Terminal, Solitaire }
 
-    // Enums needed by other scripts
-    public enum DesktopActivity
-    {
-        Idle, OrganizingFiles, ReviewingNotes, SystemMaintenance, 
-        Playing, Researching, WaitingForConnection, InConversation
-    }
+    [Header("Desktop Assets")]
+    public Color desktopColor = new Color32(0, 128, 128, 255);
+    public TMP_FontAsset windows31Font;
+    public Texture2D[] iconTextures; // Assign in Inspector
+    public AudioClip[] systemSounds; // Assign sounds like "startup", "click", "error", "card"
 
-    public enum ProgramType
-    {
-        FileManager, Notepad, SystemMonitor, Terminal, Solitaire, Calculator
-    }
+    [Header("Behavior")]
+    public bool skipBootOnRestart = false;
 
     // Core Components
     private Canvas desktopCanvas;
     private Image desktopBackground;
+    private AudioSource audioSource;
+    private List<DesktopIcon> desktopIcons = new List<DesktopIcon>();
+    private List<Window> openWindows = new List<Window>();
     private bool isReady = false;
-    private DesktopActivity currentActivity = DesktopActivity.Idle;
 
     void Awake()
     {
-        // Singleton enforcement
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
+        if (Instance != null) { Destroy(gameObject); return; }
         Instance = this;
-        
-        Debug.Log("Windows31DesktopManager: Awake - Instance created");
     }
 
     void Start()
     {
-        Debug.Log("Windows31DesktopManager: Start - Beginning desktop creation");
-        
-        // NUCLEAR OPTION: Clear everything first
-        ClearAllCanvases();
-        
-        // Create desktop immediately
-        CreateDesktop();
+        StartCoroutine(InitializeDesktop());
     }
 
-    void ClearAllCanvases()
+    private IEnumerator InitializeDesktop()
     {
-        Debug.Log("Windows31DesktopManager: Clearing all existing canvases");
-        
-        Canvas[] allCanvases = FindObjectsOfType<Canvas>();
-        foreach (Canvas canvas in allCanvases)
-        {
-            Debug.Log($"Destroying canvas: {canvas.name}");
-            DestroyImmediate(canvas.gameObject);
-        }
-        
-        Debug.Log($"Cleared {allCanvases.Length} canvases");
-    }
-
-    void CreateDesktop()
-    {
-        Debug.Log("Windows31DesktopManager: Creating desktop canvas");
-        
-        // Create canvas
-        GameObject canvasGO = new GameObject("DesktopCanvas");
-        desktopCanvas = canvasGO.AddComponent<Canvas>();
-        desktopCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        desktopCanvas.sortingOrder = 0; // Base layer
-        
-        // Add canvas scaler
-        CanvasScaler scaler = canvasGO.AddComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1024, 768);
-        
-        // Add graphics raycaster
-        canvasGO.AddComponent<GraphicRaycaster>();
-        
-        Debug.Log("Windows31DesktopManager: Canvas created, creating background");
-        
-        // Create background
-        CreateBackground();
-        
-        // Create basic UI
+        Debug.Log("DESKMAN: Initializing Desktop Environment...");
+        CreateDesktopCanvas();
+        CreateDesktopBackground();
         CreateTaskbar();
         
+        audioSource = gameObject.AddComponent<AudioSource>();
+
+        yield return null;
         isReady = true;
-        Debug.Log("Windows31DesktopManager: Desktop creation COMPLETE");
+        Debug.Log("DESKMAN: Desktop Ready with Audio.");
     }
-
-    void CreateBackground()
+    
+    #region Public API & State Management
+    public void StartBootSequence()
     {
-        GameObject bgGO = new GameObject("DesktopBackground");
-        bgGO.transform.SetParent(desktopCanvas.transform, false);
-        
-        desktopBackground = bgGO.AddComponent<Image>();
-        desktopBackground.color = desktopColor;
-        
-        // Fill screen
-        RectTransform bgRect = desktopBackground.rectTransform;
-        bgRect.anchorMin = Vector2.zero;
-        bgRect.anchorMax = Vector2.one;
-        bgRect.offsetMin = Vector2.zero;
-        bgRect.offsetMax = Vector2.zero;
-        
-        Debug.Log($"Windows31DesktopManager: Background created with color {desktopColor}");
-    }
-
-    void CreateTaskbar()
-    {
-        GameObject taskbarGO = new GameObject("Taskbar");
-        taskbarGO.transform.SetParent(desktopCanvas.transform, false);
-        
-        Image taskbarBg = taskbarGO.AddComponent<Image>();
-        taskbarBg.color = new Color32(192, 192, 192, 255);
-        
-        RectTransform taskbarRect = taskbarBg.rectTransform;
-        taskbarRect.anchorMin = new Vector2(0, 0);
-        taskbarRect.anchorMax = new Vector2(1, 0);
-        taskbarRect.offsetMin = Vector2.zero;
-        taskbarRect.offsetMax = new Vector2(0, 30);
-        
-        Debug.Log("Windows31DesktopManager: Taskbar created");
-    }
-
-    void Update()
-    {
-        if (debugMode)
-        {
-            HandleDebugKeys();
-        }
-    }
-
-    void HandleDebugKeys()
-    {
-        if (Input.GetKeyDown(KeyCode.F9))
-        {
-            LogStatus();
-        }
-        
-        if (Input.GetKeyDown(KeyCode.F10))
-        {
-            ForceBackgroundColor();
-        }
-        
-        if (Input.GetKeyDown(KeyCode.F11))
-        {
-            RecreateDesktop();
-        }
-        
-        if (Input.GetKeyDown(KeyCode.F12))
-        {
-            LogAllCanvases();
-        }
-    }
-
-    void LogStatus()
-    {
-        Debug.Log("=== DESKTOP STATUS ===");
-        Debug.Log($"Ready: {isReady}");
-        Debug.Log($"Canvas: {(desktopCanvas != null ? "EXISTS" : "NULL")}");
-        Debug.Log($"Background: {(desktopBackground != null ? "EXISTS" : "NULL")}");
-        
-        if (desktopCanvas != null)
-        {
-            Debug.Log($"Canvas Active: {desktopCanvas.gameObject.activeInHierarchy}");
-            Debug.Log($"Canvas Order: {desktopCanvas.sortingOrder}");
-        }
-        
-        if (desktopBackground != null)
-        {
-            Debug.Log($"Background Color: {desktopBackground.color}");
-            Debug.Log($"Background Active: {desktopBackground.gameObject.activeInHierarchy}");
-        }
-        
-        Debug.Log("==================");
-    }
-
-    void ForceBackgroundColor()
-    {
-        if (desktopBackground != null)
-        {
-            desktopBackground.color = desktopColor;
-            Debug.Log($"Forced background color to {desktopColor}");
-        }
-        else
-        {
-            Debug.LogError("Cannot force color - background is null!");
-        }
-    }
-
-    void RecreateDesktop()
-    {
-        Debug.Log("Recreating desktop");
-        
-        isReady = false;
-        
-        if (desktopCanvas != null)
-        {
-            DestroyImmediate(desktopCanvas.gameObject);
-        }
-        
-        CreateDesktop();
-    }
-
-    void LogAllCanvases()
-    {
-        Canvas[] canvases = FindObjectsOfType<Canvas>();
-        Debug.Log($"=== CANVAS COUNT: {canvases.Length} ===");
-        
-        foreach (Canvas c in canvases)
-        {
-            Image bg = c.GetComponentInChildren<Image>();
-            Debug.Log($"Canvas: {c.name}, Order: {c.sortingOrder}, Color: {(bg != null ? bg.color.ToString() : "No Image")}");
-        }
-        
-        Debug.Log("================================");
-    }
-
-    public bool IsReady()
-    {
-        return isReady && desktopCanvas != null && desktopBackground != null;
-    }
-
-    // Public methods needed by other scripts
-    public void BeginActivity(DesktopActivity activity)
-    {
-        currentActivity = activity;
-        Debug.Log($"Windows31DesktopManager: Activity set to {activity}");
-    }
-
-    public void LaunchProgram(ProgramType programType)
-    {
-        Debug.Log($"Windows31DesktopManager: Would launch {programType}");
-    }
-
-    public void TriggerConversationMode()
-    {
-        currentActivity = DesktopActivity.InConversation;
-        Debug.Log("Windows31DesktopManager: Conversation mode triggered");
+        StartCoroutine(SimulateBoot());
     }
 
     public void ShowDesktop()
@@ -259,57 +72,191 @@ public class Windows31DesktopManager : MonoBehaviour
         if (desktopCanvas != null)
         {
             desktopCanvas.gameObject.SetActive(true);
+            foreach (var icon in desktopIcons) if(icon != null) icon.gameObject.SetActive(true);
+            foreach (var window in openWindows) if(window != null) window.gameObject.SetActive(true);
         }
     }
 
-    public string GetDebugInfo()
+    public void TriggerConversationMode()
     {
-        return $"Ready: {IsReady()}, Activity: {currentActivity}";
+        foreach (var icon in desktopIcons) if(icon != null) icon.gameObject.SetActive(false);
+        foreach (var window in openWindows) if(window != null) window.gameObject.SetActive(false);
+    }
+    
+    public bool IsReady() => isReady;
+    
+    public DesktopIcon GetIcon(ProgramType type) => desktopIcons.FirstOrDefault(i => i != null && i.programType == type);
+    
+    public Window GetWindow(string title) => openWindows.FirstOrDefault(w => w != null && w.title.Contains(title));
+
+    public Image GetDesktopBackground() => this.desktopBackground;
+    #endregion
+
+    #region Program Simulation
+    public void LaunchProgram(ProgramType programType)
+    {
+        PlaySound("click");
+        Window existingWindow = GetWindow(programType.ToString());
+        if (existingWindow != null)
+        {
+            existingWindow.transform.SetAsLastSibling();
+            PlaySound("error");
+            return;
+        }
+
+        Window newWindow = CreateNewWindow(programType.ToString(), new Vector2(450, 350));
+        
+        GameObject contentGO = new GameObject(programType.ToString() + "Content");
+        contentGO.transform.SetParent(newWindow.contentArea, false);
+        var rt = contentGO.AddComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.offsetMin = rt.offsetMax = Vector2.zero;
+
+        switch (programType)
+        {
+            case ProgramType.FileManager:
+                contentGO.AddComponent<FileManager>().Initialize();
+                break;
+            case ProgramType.Notepad:
+                var notepad = contentGO.AddComponent<Notepad>();
+                notepad.Initialize();
+                notepad.TypeText("Cycle 7 summary:\n\nThe Overseer signal spiked when we discussed the exit code. This is not a coincidence. Nova's skepticism is becoming predictable... almost scripted. Is she a failsafe?\n\nThe glitches are becoming more frequent. They align with our fears. Is the simulation listening?");
+                break;
+            case ProgramType.SystemMonitor:
+                contentGO.AddComponent<SystemMonitor>().Initialize();
+                break;
+            case ProgramType.Solitaire:
+                 newWindow.SetSize(new Vector2(500, 400));
+                contentGO.AddComponent<Solitaire>().Initialize();
+                break;
+        }
+    }
+    #endregion
+
+    #region Audio System
+    public void PlaySound(string soundName)
+    {
+        if (audioSource == null) return;
+        var sound = System.Array.Find(systemSounds, s => s.name.Equals(soundName, System.StringComparison.OrdinalIgnoreCase));
+        if (sound != null)
+        {
+            audioSource.PlayOneShot(sound);
+        }
+        else
+        {
+            Debug.LogWarning($"DESKMAN: Sound '{soundName}' not found.");
+        }
+    }
+    #endregion
+    
+    #region Glitch System Hooks
+    public void TriggerScreenFlicker()
+    {
+        StartCoroutine(FlickerEffect());
     }
 
-    void OnGUI()
+    private IEnumerator FlickerEffect()
     {
-        if (!debugMode) return;
-        
-        GUILayout.BeginArea(new Rect(10, 10, 250, 200));
-        GUILayout.BeginVertical("box");
-        
-        GUILayout.Label("Windows 3.1 Desktop");
-        GUILayout.Space(5);
-        
-        GUILayout.Label($"Ready: {(IsReady() ? "YES" : "NO")}");
-        GUILayout.Label($"Canvas: {(desktopCanvas != null ? "OK" : "NULL")}");
-        GUILayout.Label($"Background: {(desktopBackground != null ? "OK" : "NULL")}");
-        
-        GUILayout.Space(10);
-        
-        if (GUILayout.Button("F9: Log Status"))
-            LogStatus();
-            
-        if (GUILayout.Button("F10: Force Color"))
-            ForceBackgroundColor();
-            
-        if (GUILayout.Button("F11: Recreate"))
-            RecreateDesktop();
-            
-        if (GUILayout.Button("F12: Log Canvases"))
-            LogAllCanvases();
-        
-        GUILayout.Space(10);
-        
-        // Color test buttons
-        if (GUILayout.Button("Red")) { desktopColor = Color.red; ForceBackgroundColor(); }
-        if (GUILayout.Button("Green")) { desktopColor = Color.green; ForceBackgroundColor(); }
-        if (GUILayout.Button("Blue")) { desktopColor = Color.blue; ForceBackgroundColor(); }
-        if (GUILayout.Button("Teal")) { desktopColor = new Color32(0, 128, 128, 255); ForceBackgroundColor(); }
-        
-        GUILayout.EndVertical();
-        GUILayout.EndArea();
+        if (desktopBackground == null) yield break;
+        desktopBackground.color = Color.black;
+        yield return new WaitForSeconds(0.05f);
+        desktopBackground.color = desktopColor;
     }
 
-    void OnDestroy()
+    public Window GetRandomOpenWindow()
     {
-        if (Instance == this)
-            Instance = null;
+        var activeWindows = openWindows.Where(w => w != null && w.gameObject.activeSelf).ToList();
+        if (activeWindows.Count == 0) return null;
+        return activeWindows[Random.Range(0, activeWindows.Count)];
     }
+    #endregion
+
+    #region UI Creation
+    private void CreateDesktopCanvas()
+    {
+        GameObject canvasGO = new GameObject("Windows31_Canvas");
+        canvasGO.transform.SetParent(this.transform);
+        desktopCanvas = canvasGO.AddComponent<Canvas>();
+        desktopCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        desktopCanvas.sortingOrder = -10;
+
+        var scaler = canvasGO.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1024, 768);
+        
+        canvasGO.AddComponent<GraphicRaycaster>();
+    }
+
+    private void CreateDesktopBackground()
+    {
+        GameObject bgGO = new GameObject("DesktopBackground");
+        bgGO.transform.SetParent(desktopCanvas.transform, false);
+        desktopBackground = bgGO.AddComponent<Image>();
+        desktopBackground.color = desktopColor;
+        
+        var rt = bgGO.GetComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+    }
+
+    private void CreateTaskbar()
+    {
+        GameObject taskbarGO = new GameObject("Taskbar");
+        taskbarGO.transform.SetParent(desktopCanvas.transform, false);
+        var image = taskbarGO.AddComponent<Image>();
+        image.color = new Color32(192, 192, 192, 255);
+
+        var rt = taskbarGO.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0, 0); rt.anchorMax = new Vector2(1, 0);
+        rt.sizeDelta = new Vector2(0, 30); rt.anchoredPosition = new Vector2(0, 15);
+    }
+    
+    private void CreateDesktopIcons()
+    {
+        Vector2 startPos = new Vector2(40, -40);
+        float xOffset = 90;
+        float yOffset = -100;
+        
+        CreateIcon(ProgramType.FileManager, "File Manager", new Vector2(startPos.x, startPos.y));
+        CreateIcon(ProgramType.Notepad, "Research Notes", new Vector2(startPos.x, startPos.y + yOffset));
+        CreateIcon(ProgramType.SystemMonitor, "SysMon", new Vector2(startPos.x, startPos.y + 2 * yOffset));
+        CreateIcon(ProgramType.Terminal, "Terminal", new Vector2(startPos.x + xOffset, startPos.y));
+        CreateIcon(ProgramType.Solitaire, "Solitaire", new Vector2(startPos.x + xOffset, startPos.y + yOffset));
+    }
+
+    private void CreateIcon(ProgramType type, string name, Vector2 position)
+    {
+        GameObject iconGO = new GameObject(name);
+        iconGO.transform.SetParent(desktopCanvas.transform, false);
+        var icon = iconGO.AddComponent<DesktopIcon>();
+        icon.Initialize(name, type, position);
+        icon.OnDoubleClick += () => LaunchProgram(type);
+        desktopIcons.Add(icon);
+    }
+    
+    private Window CreateNewWindow(string title, Vector2 size)
+    {
+        GameObject windowGO = new GameObject(title + " Window");
+        windowGO.transform.SetParent(desktopCanvas.transform, false);
+        var window = windowGO.AddComponent<Window>();
+        window.Initialize(title, size, Random.Range(128, 512));
+        openWindows.Add(window);
+        window.OnClose += () => {
+            openWindows.Remove(window);
+            Destroy(window.gameObject);
+        };
+        return window;
+    }
+    
+    private IEnumerator SimulateBoot()
+    {
+        desktopCanvas.gameObject.SetActive(false);
+        PlaySound("boot");
+        yield return new WaitForSeconds(skipBootOnRestart ? 0.5f : 4.0f);
+        desktopCanvas.gameObject.SetActive(true);
+        if (desktopIcons.Count == 0) CreateDesktopIcons();
+        PlaySound("startup");
+        SimulationController.Instance.OnBootComplete();
+    }
+    #endregion
 }
