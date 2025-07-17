@@ -2,12 +2,14 @@ using UnityEngine;
 using System.Collections;
 using TMPro;
 
+// The FMODUnity using directive is commented out to prevent errors if the package is missing.
+// If you have the FMOD package installed, you can uncomment this line.
+// using FMODUnity; 
+
 /// <summary>
 /// **Rewritten: NeuralCascadeSetup**
 /// Vision: Master setup script for the Neural Cascade Windows 3.1 experience.
-/// Initializes all systems in a clean, sequential order to ensure stability and
-/// readiness before the simulation begins. This script acts as the master
-/// orchestrator for the entire project.
+/// Initializes all systems in a clean, sequential order to ensure stability.
 /// </summary>
 public class NeuralCascadeSetup : MonoBehaviour
 {
@@ -28,8 +30,6 @@ public class NeuralCascadeSetup : MonoBehaviour
     public int minConversationMessages = 8;
     public int maxConversationMessages = 20;
 
-    private bool isSetupComplete = false;
-
     void Start()
     {
         if (autoInitialize)
@@ -38,129 +38,79 @@ public class NeuralCascadeSetup : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// The complete, ordered initialization sequence for the experience.
-    /// </summary>
     public IEnumerator InitializeNeuralCascadeExperience()
     {
         Debug.Log("### NEURAL CASCADE INITIALIZATION SEQUENCE STARTING ###");
+        
+        // FMOD code is commented out to prevent package-related errors.
+        // if (RuntimeManager.IsInitialized) { RuntimeManager.StudioUnloadAllEvents(); }
 
-        // Step 1: Initialize the core data and state managers.
-        yield return StartCoroutine(InitializeDialogueSystem());
+        // Step 1: Instantiate all manager components
+        InstantiateManagers();
 
-        // Step 2: Initialize the primary user interaction system.
-        yield return StartCoroutine(InitializeCursorSystem());
+        // Wait a frame for all Awake() methods to be called.
+        yield return null;
 
-        // Step 3: Initialize the main environment.
-        yield return StartCoroutine(InitializeDesktopSystem());
+        // Step 2: Configure the managers with assets and settings
+        ConfigureManagers();
 
-        // Step 4: Initialize the conversation interface.
-        yield return StartCoroutine(InitializeTerminalSystem());
+        // Step 3: Wait for all managers to report that they are ready
+        yield return StartCoroutine(WaitForManagers());
 
-        // Step 5: Initialize the master simulation controller.
-        yield return StartCoroutine(InitializeSimulationController());
+        // FMOD code is commented out.
+        // if (!RuntimeManager.IsInitialized) { try { RuntimeManager.Initialize(); } catch {} }
 
-        // Step 6: Verify all systems are integrated and ready.
-        yield return StartCoroutine(VerifySystemIntegration());
-
-        isSetupComplete = true;
         Debug.Log("### NEURAL CASCADE SETUP COMPLETE. HANDING OFF TO SIMULATION CONTROLLER. ###");
     }
 
-    private IEnumerator InitializeDialogueSystem()
+    private void InstantiateManagers()
     {
-        Debug.Log("SETUP: Initializing Dialogue System...");
-        if (DialogueState.Instance == null) { gameObject.AddComponent<DialogueState>(); }
-        if (TopicManager.Instance == null) { gameObject.AddComponent<TopicManager>(); }
-        if (ConversationThreadManager.Instance == null) { gameObject.AddComponent<ConversationThreadManager>(); }
-        if (DialogueEngine.Instance == null) { gameObject.AddComponent<DialogueEngine>(); }
-
-        float timeout = 10f;
-        while (!DialogueEngine.Instance.IsReady() && timeout > 0)
-        {
-            yield return new WaitForSeconds(0.1f);
-            timeout -= 0.1f;
-        }
-        Debug.Log(DialogueEngine.Instance.IsReady() ? "SETUP: Dialogue System... READY" : "SETUP: Dialogue System... TIMEOUT");
+        if (FindObjectOfType<DialogueState>() == null) gameObject.AddComponent<DialogueState>();
+        if (FindObjectOfType<TopicManager>() == null) gameObject.AddComponent<TopicManager>();
+        if (FindObjectOfType<ConversationThreadManager>() == null) gameObject.AddComponent<ConversationThreadManager>();
+        if (FindObjectOfType<DialogueEngine>() == null) gameObject.AddComponent<DialogueEngine>();
+        if (FindObjectOfType<CursorController>() == null) gameObject.AddComponent<CursorController>();
+        if (FindObjectOfType<Windows31DesktopManager>() == null) gameObject.AddComponent<Windows31DesktopManager>();
+        if (FindObjectOfType<MatrixTerminalManager>() == null) gameObject.AddComponent<MatrixTerminalManager>();
+        if (FindObjectOfType<SimulationController>() == null) gameObject.AddComponent<SimulationController>();
+        if (FindObjectOfType<DesktopAI>() == null) gameObject.AddComponent<DesktopAI>();
     }
 
-    private IEnumerator InitializeCursorSystem()
+    private void ConfigureManagers()
     {
-        Debug.Log("SETUP: Initializing Cursor System...");
-        if (CursorController.Instance == null)
-        {
-            var controller = gameObject.AddComponent<CursorController>();
-            controller.cursorTextures = cursorTextures;
-        }
-        yield return new WaitUntil(() => CursorController.Instance != null);
-        Debug.Log("SETUP: Cursor System... READY");
+        Windows31DesktopManager.Instance.windows31Font = windows31FontAsset;
+        Windows31DesktopManager.Instance.iconTextures = iconTextures;
+        Windows31DesktopManager.Instance.systemSounds = systemSounds;
+        Windows31DesktopManager.Instance.skipBootOnRestart = skipBootSequence;
+
+        CursorController.Instance.cursorTextures = cursorTextures;
+
+        MatrixTerminalManager.Instance.enableRetroUI = true;
+        MatrixTerminalManager.Instance.enableCRTEffects = true;
+
+        SimulationController.Instance.debugMode = debugMode;
+        SimulationController.Instance.skipBootSequence = skipBootSequence;
+        SimulationController.Instance.minDesktopTime = minDesktopTime;
+        SimulationController.Instance.maxDesktopTime = maxDesktopTime;
+        SimulationController.Instance.minTerminalMessages = minConversationMessages;
+        SimulationController.Instance.maxTerminalMessages = maxConversationMessages;
     }
 
-    private IEnumerator InitializeDesktopSystem()
+    private IEnumerator WaitForManagers()
     {
-        Debug.Log("SETUP: Initializing Desktop Environment...");
-        if (Windows31DesktopManager.Instance == null)
-        {
-            var manager = gameObject.AddComponent<Windows31DesktopManager>();
-            manager.windows31Font = windows31FontAsset;
-            manager.iconTextures = iconTextures;
-            manager.systemSounds = systemSounds;
-            manager.skipBootOnRestart = skipBootSequence;
-        }
+        Debug.Log("SETUP: Waiting for all managers to become ready...");
+        
+        yield return new WaitUntil(() => DialogueEngine.Instance != null && DialogueEngine.Instance.IsReady());
+        Debug.Log("SETUP: DialogueEngine... READY");
+        
         yield return new WaitUntil(() => Windows31DesktopManager.Instance != null && Windows31DesktopManager.Instance.IsReady());
-        Debug.Log("SETUP: Desktop Environment... READY");
-    }
-
-    private IEnumerator InitializeTerminalSystem()
-    {
-        Debug.Log("SETUP: Initializing Terminal Interface...");
-        if (MatrixTerminalManager.Instance == null)
-        {
-            var manager = gameObject.AddComponent<MatrixTerminalManager>();
-            manager.enableRetroUI = true;
-            manager.enableCRTEffects = true;
-        }
+        Debug.Log("SETUP: Windows31DesktopManager... READY");
+        
         yield return new WaitUntil(() => MatrixTerminalManager.Instance != null && MatrixTerminalManager.Instance.IsReady());
-        Debug.Log("SETUP: Terminal Interface... READY");
-    }
+        Debug.Log("SETUP: MatrixTerminalManager... READY");
 
-    private IEnumerator InitializeSimulationController()
-    {
-        Debug.Log("SETUP: Initializing Simulation Controller...");
-        if (SimulationController.Instance == null)
-        {
-            var controller = gameObject.AddComponent<SimulationController>();
-            controller.debugMode = debugMode;
-            controller.skipBootSequence = skipBootSequence;
-            controller.minDesktopTime = minDesktopTime;
-            controller.maxDesktopTime = maxDesktopTime;
-            controller.minTerminalMessages = minConversationMessages;
-            controller.maxTerminalMessages = maxConversationMessages;
-        }
-        // The SimulationController initializes itself and its components.
+        // FIX: The call to SimulationController.Instance.IsReady() will now succeed.
         yield return new WaitUntil(() => SimulationController.Instance != null && SimulationController.Instance.IsReady());
-        Debug.Log("SETUP: Simulation Controller... READY");
-    }
-
-    private IEnumerator VerifySystemIntegration()
-    {
-        Debug.Log("SETUP: Verifying all system integrations...");
-        bool allSystemsReady = DialogueEngine.Instance.IsReady() &&
-                               CursorController.Instance != null &&
-                               Windows31DesktopManager.Instance.IsReady() &&
-                               MatrixTerminalManager.Instance.IsReady() &&
-                               SimulationController.Instance.IsReady();
-
-        if (allSystemsReady)
-        {
-            Debug.Log("SETUP: All systems verified and integrated successfully.");
-        }
-        else
-        {
-            Debug.LogError("SETUP: CRITICAL FAILURE - One or more systems failed to initialize. Experience cannot continue.");
-            // In a real build, you might show an error message here.
-            enabled = false; // Disable this script.
-        }
-        yield return null;
+        Debug.Log("SETUP: SimulationController... READY");
     }
 }

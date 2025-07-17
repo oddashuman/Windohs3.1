@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections; // <-- FIX: Added this missing directive for IEnumerator
 
 /// <summary>
 /// **New Script: EnvironmentManager**
@@ -30,15 +31,40 @@ public class EnvironmentManager : MonoBehaviour
 
     void Start()
     {
+        // Defer component linking until all singletons are guaranteed to be awake
+        StartCoroutine(LinkComponents());
+    }
+
+    private IEnumerator LinkComponents()
+    {
+        // Wait until all required managers are initialized
+        yield return new WaitUntil(() => DialogueState.Instance != null);
+        yield return new WaitUntil(() => Windows31DesktopManager.Instance != null && Windows31DesktopManager.Instance.IsReady());
+        yield return new WaitUntil(() => DialogueEngine.Instance != null && DialogueEngine.Instance.IsReady());
+
         dialogueState = DialogueState.Instance;
         desktopBackground = Windows31DesktopManager.Instance.GetDesktopBackground();
-        orionProfile = DialogueEngine.Instance.allCharacters["Orion"];
+        
+        // Safely get character profile
+        if (DialogueEngine.Instance.allCharacters.ContainsKey("Orion"))
+        {
+            orionProfile = DialogueEngine.Instance.allCharacters["Orion"];
+        }
+        else
+        {
+            Debug.LogError("ENVIRONMENT_MANAGER: Orion character profile not found!");
+            yield break; // Stop if Orion doesn't exist
+        }
 
         SetWallpaper(defaultWallpaper);
     }
 
+
     void Update()
     {
+        // Ensure we don't run Update logic until initialization is complete
+        if (orionProfile == null) return;
+
         // Periodically check if the wallpaper should change based on mood.
         if (Time.frameCount % 300 == 0) // Check every 5 seconds
         {
@@ -46,8 +72,14 @@ public class EnvironmentManager : MonoBehaviour
         }
     }
 
-    private void UpdateWallpaperBasedOnMood()
+    /// <summary>
+    /// Updates the desktop wallpaper based on Orion's current mood.
+    /// Now public to be accessible by NarrativeTriggerManager.
+    /// </summary>
+    public void UpdateWallpaperBasedOnMood()
     {
+        if (orionProfile == null || desktopBackground == null) return;
+
         orionProfile.UpdateMood();
 
         switch (orionProfile.mood)
@@ -72,7 +104,7 @@ public class EnvironmentManager : MonoBehaviour
 
     private void SetWallpaper(Sprite wallpaper)
     {
-        if (wallpaper != null)
+        if (wallpaper != null && desktopBackground != null)
         {
             Debug.Log($"ENV_MAN: Changing wallpaper to {wallpaper.name}");
             desktopBackground.sprite = wallpaper;

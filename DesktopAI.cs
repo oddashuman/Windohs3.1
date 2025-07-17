@@ -74,7 +74,7 @@ public class DesktopAI : MonoBehaviour
         yield return new WaitForSeconds(1.5f);
 
         // 3. **Window Management!** Move Notepad so both are visible.
-        Window notesWindow = desktopManager.GetWindow("Notepad");
+        Window notesWindow = desktopManager.GetWindow("Research Notes");
         if (notesWindow != null)
         {
             yield return cursorController.MoveAndDrag(notesWindow.titleBar.transform.position, new Vector2(300, 0));
@@ -84,7 +84,7 @@ public class DesktopAI : MonoBehaviour
         yield return new WaitForSeconds(Random.Range(5f, 8f));
 
         // 5. Close windows
-        Window fileManagerWindow = desktopManager.GetWindow("FileManager");
+        Window fileManagerWindow = desktopManager.GetWindow("File Manager");
         if(fileManagerWindow != null) yield return cursorController.MoveToAndClick(fileManagerWindow.closeButton.transform.position, "casual");
         if(notesWindow != null) yield return cursorController.MoveToAndClick(notesWindow.closeButton.transform.position, "casual");
     }
@@ -97,7 +97,7 @@ public class DesktopAI : MonoBehaviour
         
         // Read for a while, then minimize
         yield return new WaitForSeconds(Random.Range(6f, 10f));
-        Window notesWindow = desktopManager.GetWindow("Notepad");
+        Window notesWindow = desktopManager.GetWindow("Research Notes");
         if (notesWindow != null && notesWindow.minimizeButton != null)
         {
              yield return cursorController.MoveToAndClick(notesWindow.minimizeButton.transform.position, "casual");
