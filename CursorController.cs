@@ -3,12 +3,6 @@ using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
 
-/// <summary>
-/// **Complete Code: CursorController**
-/// Vision: Provides extremely realistic human cursor movement. Includes personality
-/// traits (hesitation, precision), fatigue simulation, and a high-level API for
-/// the DesktopAI to direct Orion's actions with simple commands (e.g., "click this icon").
-/// </summary>
 public class CursorController : MonoBehaviour
 {
     public static CursorController Instance { get; private set; }
@@ -21,7 +15,6 @@ public class CursorController : MonoBehaviour
     [Header("Movement Physics")]
     public float baseSpeed = 800f;
     public float hesitationChance = 0.15f;
-    public AnimationCurve humanMovementCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
 
     // State
     private Vector2 currentPosition;
@@ -33,6 +26,16 @@ public class CursorController : MonoBehaviour
     {
         if (Instance != null) { Destroy(gameObject); return; }
         Instance = this;
+
+        if (cursorTextures == null || cursorTextures.Length == 0)
+        {
+            Debug.LogWarning("CursorController: No cursor textures assigned in the Inspector. Creating a fallback cursor.");
+            Texture2D fallbackTexture = new Texture2D(1, 1);
+            fallbackTexture.SetPixel(0, 0, Color.white);
+            fallbackTexture.Apply();
+            cursorTextures = new Texture2D[] { fallbackTexture };
+        }
+
         InitializeCursor();
     }
 
@@ -44,16 +47,14 @@ public class CursorController : MonoBehaviour
         cursorCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
         cursorCanvas.sortingOrder = 10000;
 
-        cursorRect = cursorGO.AddComponent<RectTransform>();
+        cursorRect = cursorGO.GetComponent<RectTransform>(); 
         cursorRect.sizeDelta = new Vector2(32, 32);
-        cursorRect.pivot = new Vector2(0, 1); // Top-left pivot for authentic feel
+        cursorRect.pivot = new Vector2(0, 1);
 
         cursorImage = cursorGO.AddComponent<Image>();
-        if (cursorTextures != null && cursorTextures.Length > 0)
-        {
-            var sprite = Sprite.Create(cursorTextures[0], new Rect(0, 0, cursorTextures[0].width, cursorTextures[0].height), new Vector2(0, 1));
-            cursorImage.sprite = sprite;
-        }
+        var sprite = Sprite.Create(cursorTextures[0], new Rect(0, 0, cursorTextures[0].width, cursorTextures[0].height), new Vector2(0, 1));
+        cursorImage.sprite = sprite;
+
 
         Cursor.visible = false;
         currentPosition = new Vector2(Screen.width / 2f, Screen.height / 2f);
@@ -119,15 +120,22 @@ public class CursorController : MonoBehaviour
         while (elapsedTime < moveTime)
         {
             float t = elapsedTime / moveTime;
-            float curvedT = humanMovementCurve.Evaluate(t);
+            float curvedT = t * t * (3f - 2f * t);
+
             currentPosition = (1 - curvedT) * (1 - curvedT) * startPosition + 2 * (1 - curvedT) * curvedT * controlPoint + curvedT * curvedT * target;
-            cursorRect.position = currentPosition;
+            if (cursorRect != null)
+            {
+                cursorRect.position = currentPosition;
+            }
             elapsedTime += Time.deltaTime;
             yield return null;
         }
 
         currentPosition = target;
-        cursorRect.position = currentPosition;
+        if (cursorRect != null)
+        {
+            cursorRect.position = currentPosition;
+        }
     }
     
     private IEnumerator PerformClick(bool isDoubleClick)
@@ -141,7 +149,10 @@ public class CursorController : MonoBehaviour
          if(immediate)
          {
               currentPosition = target;
-              cursorRect.position = currentPosition;
+              if (cursorRect != null)
+              {
+                  cursorRect.position = currentPosition;
+              }
          }
          else
          {
@@ -152,7 +163,6 @@ public class CursorController : MonoBehaviour
 
     public Vector2 GetCurrentPosition() => currentPosition;
     
-    // --- Missing Method Stubs ---
     public bool IsMoving() => isMoving;
     public void StartIdleMovement() { /* TODO */ }
     public void SetPrecisionMode(bool precision) { /* TODO */ }

@@ -2,15 +2,6 @@ using UnityEngine;
 using System.Collections;
 using TMPro;
 
-// The FMODUnity using directive is commented out to prevent errors if the package is missing.
-// If you have the FMOD package installed, you can uncomment this line.
-// using FMODUnity; 
-
-/// <summary>
-/// **Rewritten: NeuralCascadeSetup**
-/// Vision: Master setup script for the Neural Cascade Windows 3.1 experience.
-/// Initializes all systems in a clean, sequential order to ensure stability.
-/// </summary>
 public class NeuralCascadeSetup : MonoBehaviour
 {
     [Header("Setup Configuration")]
@@ -42,23 +33,10 @@ public class NeuralCascadeSetup : MonoBehaviour
     {
         Debug.Log("### NEURAL CASCADE INITIALIZATION SEQUENCE STARTING ###");
         
-        // FMOD code is commented out to prevent package-related errors.
-        // if (RuntimeManager.IsInitialized) { RuntimeManager.StudioUnloadAllEvents(); }
-
-        // Step 1: Instantiate all manager components
         InstantiateManagers();
-
-        // Wait a frame for all Awake() methods to be called.
-        yield return null;
-
-        // Step 2: Configure the managers with assets and settings
+        yield return null; 
         ConfigureManagers();
-
-        // Step 3: Wait for all managers to report that they are ready
         yield return StartCoroutine(WaitForManagers());
-
-        // FMOD code is commented out.
-        // if (!RuntimeManager.IsInitialized) { try { RuntimeManager.Initialize(); } catch {} }
 
         Debug.Log("### NEURAL CASCADE SETUP COMPLETE. HANDING OFF TO SIMULATION CONTROLLER. ###");
     }
@@ -78,12 +56,17 @@ public class NeuralCascadeSetup : MonoBehaviour
 
     private void ConfigureManagers()
     {
+        // CursorController initialization is no longer handled here.
         Windows31DesktopManager.Instance.windows31Font = windows31FontAsset;
         Windows31DesktopManager.Instance.iconTextures = iconTextures;
         Windows31DesktopManager.Instance.systemSounds = systemSounds;
         Windows31DesktopManager.Instance.skipBootOnRestart = skipBootSequence;
 
-        CursorController.Instance.cursorTextures = cursorTextures;
+        // This line was moved from the reverted code; it is safe to keep
+        if (CursorController.Instance != null)
+        {
+            CursorController.Instance.cursorTextures = cursorTextures;
+        }
 
         MatrixTerminalManager.Instance.enableRetroUI = true;
         MatrixTerminalManager.Instance.enableCRTEffects = true;
@@ -107,9 +90,8 @@ public class NeuralCascadeSetup : MonoBehaviour
         Debug.Log("SETUP: Windows31DesktopManager... READY");
         
         yield return new WaitUntil(() => MatrixTerminalManager.Instance != null && MatrixTerminalManager.Instance.IsReady());
-        Debug.Log("SETUP: MatrixTerminalManager... READY");
+        Debug.log("SETUP: MatrixTerminalManager... READY");
 
-        // FIX: The call to SimulationController.Instance.IsReady() will now succeed.
         yield return new WaitUntil(() => SimulationController.Instance != null && SimulationController.Instance.IsReady());
         Debug.Log("SETUP: SimulationController... READY");
     }

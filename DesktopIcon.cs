@@ -55,11 +55,6 @@ public class DesktopIcon : MonoBehaviour, IPointerClickHandler
         GameObject iconImageGO = new GameObject("IconImage");
         iconImageGO.transform.SetParent(transform, false);
         iconImage = iconImageGO.AddComponent<Image>();
-        if (iconTexture != null)
-        {
-            Sprite iconSprite = Sprite.Create(iconTexture, new Rect(0, 0, iconTexture.width, iconTexture.height), Vector2.one * 0.5f);
-            iconImage.sprite = iconSprite;
-        }
         iconImage.raycastTarget = false;
         RectTransform iconImageRect = iconImage.rectTransform;
         iconImageRect.anchorMin = new Vector2(0, 0.3f);
@@ -83,29 +78,39 @@ public class DesktopIcon : MonoBehaviour, IPointerClickHandler
         iconLabelRect.offsetMax = new Vector2(-2, 0);
     }
 
-    public void Initialize(string name, Windows31DesktopManager.ProgramType program, Vector2 position, TMP_FontAsset font)
+    public void Initialize(string name, Windows31DesktopManager.ProgramType program, Vector2 position, TMP_FontAsset font, Texture2D texture)
     {
         iconName = name;
         programType = program;
+        iconTexture = texture;
         iconRect.anchoredPosition = position;
-        iconLabel.text = iconName;
-        iconLabel.font = font;
+        if (iconLabel != null)
+        {
+            iconLabel.text = iconName;
+            iconLabel.font = font;
+        }
         SetIconTexture(program);
     }
 
     void SetIconTexture(Windows31DesktopManager.ProgramType program)
     {
-        Color iconColor = Color.white;
-        switch (program)
+        if (iconImage != null && iconTexture != null)
         {
-            case Windows31DesktopManager.ProgramType.FileManager: iconColor = new Color32(255, 255, 0, 255); break;
-            case Windows31DesktopManager.ProgramType.Notepad: iconColor = new Color32(255, 255, 255, 255); break;
-            case Windows31DesktopManager.ProgramType.SystemMonitor: iconColor = new Color32(128, 128, 128, 255); break;
-            case Windows31DesktopManager.ProgramType.Terminal: iconColor = new Color32(0, 255, 0, 255); break;
-            case Windows31DesktopManager.ProgramType.Solitaire: iconColor = new Color32(255, 0, 0, 255); break;
+            Sprite iconSprite = Sprite.Create(iconTexture, new Rect(0, 0, iconTexture.width, iconTexture.height), Vector2.one * 0.5f);
+            iconImage.sprite = iconSprite;
+            iconImage.color = Color.white;
         }
-        if (iconImage != null)
+        else if(iconImage != null)
         {
+            Color iconColor = Color.white;
+            switch (program)
+            {
+                case Windows31DesktopManager.ProgramType.FileManager: iconColor = new Color32(255, 255, 0, 255); break;
+                case Windows31DesktopManager.ProgramType.Notepad: iconColor = new Color32(255, 255, 255, 255); break;
+                case Windows31DesktopManager.ProgramType.SystemMonitor: iconColor = new Color32(128, 128, 128, 255); break;
+                case Windows31DesktopManager.ProgramType.Terminal: iconColor = new Color32(0, 255, 0, 255); break;
+                case Windows31DesktopManager.ProgramType.Solitaire: iconColor = new Color32(255, 0, 0, 255); break;
+            }
             iconImage.color = iconColor;
         }
     }

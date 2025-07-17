@@ -158,12 +158,20 @@ public class Windows31DesktopManager : MonoBehaviour
         CreateIcon(ProgramType.Solitaire, "Solitaire", new Vector2(150, -150));
     }
 
+    // FIX: Modified CreateIcon to pass the correct texture to the DesktopIcon
     private void CreateIcon(ProgramType type, string name, Vector2 position)
     {
         GameObject iconGO = new GameObject(name);
         iconGO.transform.SetParent(desktopCanvas.transform, false);
         var icon = iconGO.AddComponent<DesktopIcon>();
-        icon.Initialize(name, type, position, windows31Font);
+
+        Texture2D iconTexture = null;
+        if (iconTextures != null && (int)type < iconTextures.Length)
+        {
+            iconTexture = iconTextures[(int)type];
+        }
+
+        icon.Initialize(name, type, position, windows31Font, iconTexture);
         icon.OnDoubleClick += () => LaunchProgram(type);
         desktopIcons.Add(icon);
     }
