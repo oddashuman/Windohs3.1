@@ -28,10 +28,11 @@ public class DialogueEngine : MonoBehaviour
     private IEnumerator InitializeEngine()
     {
         Debug.Log("DIALOGUE_ENGINE: Initializing...");
-        
-        // This ensures other managers are ready before this one starts
-        yield return new WaitUntil(() => TopicManager.Instance != null && ConversationThreadManager.Instance != null && DialogueState.Instance != null);
-        
+
+        yield return new WaitUntil(() => TopicManager.Instance != null &&
+                                       ConversationThreadManager.Instance != null &&
+                                       DialogueState.Instance != null);
+
         topicManager = TopicManager.Instance;
         threadManager = ConversationThreadManager.Instance;
         dialogueState = DialogueState.Instance;
@@ -41,7 +42,7 @@ public class DialogueEngine : MonoBehaviour
         isReady = true;
         Debug.Log("DIALOGUE_ENGINE: Ready.");
     }
-    
+
     public bool IsReady() => isReady;
 
     private void RegisterCharacters()
@@ -59,8 +60,8 @@ public class DialogueEngine : MonoBehaviour
         ConversationThread currentThread = threadManager.GetActiveThread();
         if (currentThread == null)
         {
-            var participants = new List<CharacterProfile> { allCharacters["Orion"], allCharacters["Nova"] };
-            var topic = topicManager.GetRandomTopic();
+            var participants = new List<CharacterProfile> { allCharacters["Orion"], allCharacters["Nova"], allCharacters["Echo"], allCharacters["Lumen"] };
+            var topic = dialogueState.globalTension > 0.6f ? topicManager.GetControversialOrForbidden() : topicManager.GetRandomTopic();
             currentThread = threadManager.StartThread(participants, topic);
         }
 
@@ -72,22 +73,22 @@ public class DialogueEngine : MonoBehaviour
 
         var message = new DialogueMessage(speaker.name, replyText);
         currentThread.RegisterMessage(message);
+        dialogueState.AddToNarrativeHistory("Dialogue", $"{speaker.name}: {replyText}");
         return message;
     }
 
     private CharacterProfile DetermineNextSpeaker(ConversationThread thread)
     {
-        var potentialSpeakers = thread.participants.Where(p => p.name != thread.lastSpeaker).ToList();
-        if (potentialSpeakers.Count == 0)
-        {
-            potentialSpeakers = thread.participants;
-        }
-        return potentialSpeakers[Random.Range(0, potentialSpeakers.Count)];
+        // Simple turn-based speaker selection for now
+        int nextSpeakerIndex = (thread.participants.FindIndex(p => p.name == thread.lastSpeaker) + 1) % thread.participants.Count;
+        return thread.participants[nextSpeakerIndex];
     }
+
 
     public void EnqueueUserMessage(string username, string message)
     {
-        // Placeholder for future implementation where characters can react to user messages
+        // This can now trigger narrative events
         Debug.Log($"User message from {username}: {message}");
+        NarrativeTriggerManager.Instance.TriggerEvent("ViewerMessage", username);
     }
 }

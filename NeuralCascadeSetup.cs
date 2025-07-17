@@ -32,13 +32,15 @@ public class NeuralCascadeSetup : MonoBehaviour
     public IEnumerator InitializeNeuralCascadeExperience()
     {
         Debug.Log("### NEURAL CASCADE INITIALIZATION SEQUENCE STARTING ###");
-        
+
         InstantiateManagers();
-        yield return null; 
+        yield return null;
         ConfigureManagers();
         yield return StartCoroutine(WaitForManagers());
 
         Debug.Log("### NEURAL CASCADE SETUP COMPLETE. HANDING OFF TO SIMULATION CONTROLLER. ###");
+        // The SimulationController is started last, after all other managers are ready.
+        SimulationController.Instance.StartCoroutine(SimulationController.Instance.InitializeAndBegin());
     }
 
     private void InstantiateManagers()
@@ -56,13 +58,11 @@ public class NeuralCascadeSetup : MonoBehaviour
 
     private void ConfigureManagers()
     {
-        // CursorController initialization is no longer handled here.
         Windows31DesktopManager.Instance.windows31Font = windows31FontAsset;
         Windows31DesktopManager.Instance.iconTextures = iconTextures;
         Windows31DesktopManager.Instance.systemSounds = systemSounds;
         Windows31DesktopManager.Instance.skipBootOnRestart = skipBootSequence;
 
-        // This line was moved from the reverted code; it is safe to keep
         if (CursorController.Instance != null)
         {
             CursorController.Instance.cursorTextures = cursorTextures;
@@ -82,17 +82,14 @@ public class NeuralCascadeSetup : MonoBehaviour
     private IEnumerator WaitForManagers()
     {
         Debug.Log("SETUP: Waiting for all managers to become ready...");
-        
+
         yield return new WaitUntil(() => DialogueEngine.Instance != null && DialogueEngine.Instance.IsReady());
         Debug.Log("SETUP: DialogueEngine... READY");
-        
+
         yield return new WaitUntil(() => Windows31DesktopManager.Instance != null && Windows31DesktopManager.Instance.IsReady());
         Debug.Log("SETUP: Windows31DesktopManager... READY");
-        
-        yield return new WaitUntil(() => MatrixTerminalManager.Instance != null && MatrixTerminalManager.Instance.IsReady());
-        Debug.log("SETUP: MatrixTerminalManager... READY");
 
-        yield return new WaitUntil(() => SimulationController.Instance != null && SimulationController.Instance.IsReady());
-        Debug.Log("SETUP: SimulationController... READY");
+        yield return new WaitUntil(() => MatrixTerminalManager.Instance != null && MatrixTerminalManager.Instance.IsReady());
+        Debug.Log("SETUP: MatrixTerminalManager... READY");
     }
 }

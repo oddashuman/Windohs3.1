@@ -30,12 +30,13 @@ public class DialogueState : MonoBehaviour
 
     // Advanced State Tracking
     private List<NarrativeEvent> narrativeHistory = new List<NarrativeEvent>();
-    private const int maxNarrativeHistory = 50;
+    private const int maxNarrativeHistory = 100;
 
     void Awake()
     {
         if (Instance != null) { Destroy(gameObject); return; }
         Instance = this;
+        DontDestroyOnLoad(gameObject);
     }
 
     /// <summary>
@@ -51,7 +52,7 @@ public class DialogueState : MonoBehaviour
             timestamp = Time.time,
             loopCount = this.loopCount
         };
-        
+
         narrativeHistory.Add(narrativeEvent);
         if (narrativeHistory.Count > maxNarrativeHistory)
         {
@@ -65,15 +66,14 @@ public class DialogueState : MonoBehaviour
     public void AddGlitchEvent(string glitchType, string description, float severity)
     {
         glitchCount++;
-        AddToNarrativeHistory("Glitch", $"{glitchType}: {description}");
+        AddToNarrativeHistory("Glitch", $"{glitchType}: {description}", "GLITCH_MANAGER");
 
-        if (severity > 2.0f)
-        {
-            globalTension += 0.1f;
-        }
-        if (glitchType.ToLower().Contains("red"))
+        globalTension = Mathf.Clamp01(globalTension + (severity * 0.05f));
+
+        if (glitchType.ToLower().Contains("red") || severity > 2.5f)
         {
             rareRedGlitchOccurred = true;
+            paranoia = Mathf.Clamp01(paranoia + 0.1f);
         }
     }
 
@@ -82,6 +82,7 @@ public class DialogueState : MonoBehaviour
     /// </summary>
     public void Reset()
     {
+        AddToNarrativeHistory("System Reset", $"Ending Loop {loopCount}");
         loopCount++;
         AddToNarrativeHistory("System Reset", $"Beginning Loop {loopCount}");
 
@@ -90,11 +91,12 @@ public class DialogueState : MonoBehaviour
         overseerWarnings = 0;
         rareRedGlitchOccurred = false;
         systemIntegrityCompromised = false;
+        observerDetected = false;
 
         // Decay emotional states, but don't erase them completely
-        globalTension *= 0.5f;
-        paranoia *= 0.6f;
-        metaAwareness *= 0.9f; // Characters retain a sense of deja vu
+        globalTension *= 0.3f; // Tension resets more significantly
+        paranoia *= 0.5f;
+        metaAwareness = Mathf.Clamp01(metaAwareness * 0.9f + 0.05f); // Retain a sense of deja vu and slightly increase it
     }
 
     public List<NarrativeEvent> GetNarrativeHistory() => narrativeHistory;

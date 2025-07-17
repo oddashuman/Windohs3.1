@@ -11,6 +11,7 @@ public class Windows31DesktopManager : MonoBehaviour
 
     public enum DesktopActivity { Idle, OrganizingFiles, ReviewingNotes, SystemMaintenance, Playing, Researching }
     public enum ProgramType { FileManager, Notepad, SystemMonitor, Terminal, Solitaire }
+    public enum ScreensaverMode { None, Mystify, FlyingWindows, Starfield }
 
     [Header("Desktop Assets")]
     public Color desktopColor = new Color32(0, 128, 128, 255);
@@ -20,6 +21,7 @@ public class Windows31DesktopManager : MonoBehaviour
 
     [Header("Behavior")]
     public bool skipBootOnRestart = false;
+    public GameObject flyingWindowPrefab; // Assign a simple window prefab for the screensaver
 
     private Canvas desktopCanvas;
     private Image desktopBackground;
@@ -27,6 +29,8 @@ public class Windows31DesktopManager : MonoBehaviour
     private List<DesktopIcon> desktopIcons = new List<DesktopIcon>();
     private List<Window> openWindows = new List<Window>();
     private bool isReady = false;
+    private Coroutine screensaverCoroutine;
+    private GameObject screensaverContainer;
 
     void Awake()
     {
@@ -67,7 +71,8 @@ public class Windows31DesktopManager : MonoBehaviour
         var existingWindow = GetWindow(title);
         if (existingWindow != null)
         {
-            existingWindow.SetActive(true);
+            existingWindow.gameObject.SetActive(true);
+            OnWindowFocused(existingWindow);
             return;
         }
 
@@ -75,8 +80,8 @@ public class Windows31DesktopManager : MonoBehaviour
         GameObject contentGO = new GameObject(title + "Content");
         contentGO.transform.SetParent(newWindow.contentArea, false);
         var rt = contentGO.AddComponent<RectTransform>();
-        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.sizeDelta = newWindow.contentArea.rect.size;
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
 
         switch (programType)
         {
@@ -84,14 +89,18 @@ public class Windows31DesktopManager : MonoBehaviour
             case ProgramType.Notepad:
                 var notepad = contentGO.AddComponent<Notepad>();
                 notepad.Initialize();
-                notepad.TypeText("Cycle 7 summary:\n\nThe Overseer signal spiked...");
+                notepad.TypeText("Cycle " + DialogueState.Instance.loopCount + " summary:\n\nThe Overseer signal spiked...");
                 break;
             case ProgramType.SystemMonitor: contentGO.AddComponent<SystemMonitor>().Initialize(); break;
             case ProgramType.Solitaire:
                 newWindow.size = new Vector2(500, 400);
                 contentGO.AddComponent<Solitaire>().Initialize();
                 break;
+            case ProgramType.Terminal:
+                MatrixTerminalManager.Instance.EnableTerminal();
+                break;
         }
+        SimulationController.Instance.ReportActivity();
     }
 
     public void PlaySound(string soundName)
@@ -125,7 +134,112 @@ public class Windows31DesktopManager : MonoBehaviour
         {
             if (w != focusedWindow) w.SetActive(false);
         }
+        focusedWindow.transform.SetAsLastSibling();
     }
+
+    public void SetScreensaver(bool active)
+    {
+        if (active)
+        {
+            if (screensaverCoroutine != null) StopCoroutine(screensaverCoroutine);
+            screensaverCoroutine = StartCoroutine(RunScreensaver());
+        }
+        else
+        {
+            if (screensaverCoroutine != null) StopCoroutine(screensaverCoroutine);
+            if (screensaverContainer != null) Destroy(screensaverContainer);
+            CursorController.Instance.SetVisibility(true);
+        }
+    }
+
+    private IEnumerator RunScreensaver()
+    {
+        CursorController.Instance.SetVisibility(false);
+        if (screensaverContainer != null) Destroy(screensaverContainer);
+        screensaverContainer = new GameObject("ScreensaverContainer");
+        screensaverContainer.transform.SetParent(desktopCanvas.transform, false);
+
+        ScreensaverMode mode = (ScreensaverMode)Random.Range(1, 4); // Pick a random screensaver
+        Debug.Log($"Starting screensaver: {mode}");
+
+        switch (mode)
+        {
+            case ScreensaverMode.Mystify:
+                yield return StartCoroutine(MystifyScreensaver());
+                break;
+            case ScreensaverMode.FlyingWindows:
+                yield return StartCoroutine(FlyingWindowsScreensaver());
+                break;
+            case ScreensaverMode.Starfield:
+                yield return StartCoroutine(StarfieldScreensaver());
+                break;
+        }
+    }
+
+    private IEnumerator MystifyScreensaver()
+    {
+        // A simple implementation of the Mystify screensaver
+        var lineRenderer = screensaverContainer.AddComponent<LineRenderer>();
+        lineRenderer.material = new Material(Shader.Find("Legacy Shaders/Particles/Alpha Blended Premultiply"));
+        lineRenderer.startColor = Color.green;
+        lineRenderer.endColor = Color.cyan;
+        lineRenderer.startWidth = 2f;
+        lineRenderer.endWidth = 2f;
+        lineRenderer.positionCount = 2;
+
+        Vector2 pos1 = new Vector2(Random.Range(0, Screen.width), Random.Range(0, Screen.height));
+        Vector2 pos2 = new Vector2(Random.Range(0, Screen.width), Random.Range(0, Screen.height));
+        Vector2 dir1 = new Vector2(Random.Range(-1f, 1f), Random.Range(-1f, 1f)).normalized * 200f;
+        Vector2 dir2 = new Vector2(Random.Range(-1f, 1f), Random.Range(-1f, 1f)).normalized * 200f;
+
+        while (true)
+        {
+            pos1 += dir1 * Time.deltaTime;
+            pos2 += dir2 * Time.deltaTime;
+
+            if (pos1.x < 0 || pos1.x > Screen.width) dir1.x *= -1;
+            if (pos1.y < 0 || pos1.y > Screen.height) dir1.y *= -1;
+            if (pos2.x < 0 || pos2.x > Screen.width) dir2.x *= -1;
+            if (pos2.y < 0 || pos2.y > Screen.height) dir2.y *= -1;
+
+            lineRenderer.SetPosition(0, pos1);
+            lineRenderer.SetPosition(1, pos2);
+            yield return null;
+        }
+    }
+
+    private IEnumerator FlyingWindowsScreensaver()
+    {
+        // A simple implementation of the Flying Windows screensaver
+        for (int i = 0; i < 10; i++)
+        {
+            var window = Instantiate(flyingWindowPrefab, screensaverContainer.transform);
+            window.GetComponent<RectTransform>().anchoredPosition = new Vector2(Random.Range(0, Screen.width), Random.Range(0, Screen.height));
+            var rb = window.AddComponent<Rigidbody2D>();
+            rb.gravityScale = 0;
+            rb.linearDamping = 0;
+            rb.angularDamping = 0;
+            rb.linearVelocity = new Vector2(Random.Range(-100f, 100f), Random.Range(-100f, 100f));
+        }
+        yield return new WaitForSeconds(float.MaxValue); // Let the physics engine handle it
+    }
+
+    private IEnumerator StarfieldScreensaver()
+    {
+        // A simple implementation of the Starfield screensaver
+        var particleSystem = screensaverContainer.AddComponent<ParticleSystem>();
+        var main = particleSystem.main;
+        main.startColor = Color.white;
+        main.startSpeed = 200;
+        main.startSize = 2;
+        var emission = particleSystem.emission;
+        emission.rateOverTime = 100;
+        var shape = particleSystem.shape;
+        shape.shapeType = ParticleSystemShapeType.Sphere;
+        shape.radius = 100;
+        yield return new WaitForSeconds(float.MaxValue);
+    }
+
 
     // --- UI Creation ---
     private void CreateDesktopCanvas()
@@ -158,7 +272,6 @@ public class Windows31DesktopManager : MonoBehaviour
         CreateIcon(ProgramType.Solitaire, "Solitaire", new Vector2(150, -150));
     }
 
-    // FIX: Modified CreateIcon to pass the correct texture to the DesktopIcon
     private void CreateIcon(ProgramType type, string name, Vector2 position)
     {
         GameObject iconGO = new GameObject(name);
@@ -188,16 +301,15 @@ public class Windows31DesktopManager : MonoBehaviour
         OnWindowFocused(window);
         return window;
     }
-    
-    // --- Missing Method Implementations ---
+
     public string GetDebugInfo()
     {
         return $"Ready: {isReady}, Icons: {desktopIcons.Count}, Open Windows: {openWindows.Count}";
     }
-    
+
     public void BeginActivity(DesktopActivity activity)
     {
         Debug.Log($"Starting desktop activity: {activity}");
-        // This would be the hook for the DesktopAI to start doing things.
+        DesktopAI.Instance.PerformActivity(activity);
     }
 }

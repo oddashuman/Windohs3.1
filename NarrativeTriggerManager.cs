@@ -30,24 +30,41 @@ public class NarrativeTriggerManager : MonoBehaviour
         eventRegistry = new Dictionary<string, System.Action<string>>
         {
             // Events triggered by viewers
-            ["ViewerGlitchRequest"] = (source) => GlitchManager.Instance?.TriggerRandomGlitch(),
-            ["ViewerTensionUp"] = (source) => DialogueState.Instance.globalTension += 0.2f,
+            ["ViewerMessage"] = (source) => {
+                DialogueState.Instance.observerDetected = true;
+                DialogueState.Instance.globalTension += 0.05f;
+                GlitchManager.Instance?.TriggerRandomGlitch(0.2f);
+            },
+            ["ViewerGlitchRequest"] = (source) => GlitchManager.Instance?.TriggerRandomGlitch(0.5f),
+            ["ViewerTensionUp"] = (source) => DialogueState.Instance.globalTension = Mathf.Clamp01(DialogueState.Instance.globalTension + 0.2f),
             ["ViewerObserve"] = (source) => {
                 DialogueState.Instance.observerDetected = true;
-                EnvironmentManager.Instance.UpdateWallpaperBasedOnMood(); // Force an environment check
+                EnvironmentManager.Instance?.UpdateWallpaperBasedOnMood();
             },
 
             // Events triggered by the simulation state
-            ["HighTension"] = (source) => GlitchManager.Instance?.TriggerRandomGlitch(),
-            ["HighAwareness"] = (source) => EnvironmentManager.Instance.UpdateWallpaperBasedOnMood(),
+            ["HighTension"] = (source) => GlitchManager.Instance?.TriggerRandomGlitch(0.8f),
+            ["HighAwareness"] = (source) => {
+                EnvironmentManager.Instance?.UpdateWallpaperBasedOnMood();
+                GlitchManager.Instance?.TriggerRandomGlitch(0.4f);
+            },
+            ["CrisisStart"] = (source) => {
+                DialogueState.Instance.globalTension = 1.0f;
+                GlitchManager.Instance?.TriggerRandomGlitch(1.0f);
+            },
         };
     }
-    
+
     /// <summary>
     /// Public entry point for any system to trigger a narrative event.
     /// </summary>
     public void TriggerEvent(string eventName, string sourceInfo)
     {
+        if (DialogueState.Instance != null)
+        {
+             DialogueState.Instance.AddToNarrativeHistory("EventTrigger", eventName, sourceInfo);
+        }
+       
         Debug.Log($"NARRATIVE_TRIGGER: Event '{eventName}' triggered by '{sourceInfo}'.");
         if (eventRegistry.ContainsKey(eventName))
         {
@@ -58,7 +75,7 @@ public class NarrativeTriggerManager : MonoBehaviour
     void Update()
     {
         // Continuously check the simulation state for potential triggers
-        if (Time.frameCount % 150 == 0) // Check every ~2.5 seconds
+        if (Time.frameCount % 150 == 0 && DialogueState.Instance != null) // Check every ~2.5 seconds
         {
             CheckSimulationStateTriggers();
         }

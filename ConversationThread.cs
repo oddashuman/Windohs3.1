@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// Enums are kept in this file as they are tightly coupled with the ConversationThread class.
 public enum ThreadStatus { Active, Stale, Closed, Escalating, Interrupted }
 public enum ConversationPhase { Introduction, Development, Complication, Climax, Resolution }
 public enum SessionType { Discovery, Investigation, Crisis, Revelation, Reset }
@@ -16,9 +15,10 @@ public class ConversationThread
     public ThreadStatus status = ThreadStatus.Active;
     public float lastActivity;
     public ConversationPhase currentPhase = ConversationPhase.Introduction;
-    
+
     private int messagesInPhase = 0;
-    
+    private const int messagesPerPhase = 5;
+
     public ConversationThread(string id, List<CharacterProfile> profiles, Topic topic)
     {
         this.id = id;
@@ -35,36 +35,44 @@ public class ConversationThread
         lastActivity = Time.time;
         UpdatePhase();
     }
-    
+
     private void UpdatePhase()
     {
-        // Simplified phase transition logic for stability
-        if (messagesInPhase > 5)
+        if (messagesInPhase >= messagesPerPhase)
         {
             messagesInPhase = 0;
             if (currentPhase < ConversationPhase.Resolution)
             {
                 currentPhase++;
                 Debug.Log($"Thread {id} advanced to phase: {currentPhase}");
+                if (DialogueState.Instance != null)
+                {
+                    DialogueState.Instance.globalTension += 0.05f;
+                }
             }
             else
             {
-                status = ThreadStatus.Stale;
+                status = ThreadStatus.Closed;
             }
         }
     }
 
-    public ProceduralReplyEngine.DialogueIntent GetPhaseAppropriateIntent(string characterName)
+    public ProceduralReplyEngine.DialogueIntent GetPhaseAppropriateIntent()
     {
-        // This logic determines the "flavor" of the conversation
         switch (currentPhase)
         {
-            case ConversationPhase.Introduction: return ProceduralReplyEngine.DialogueIntent.Question;
-            case ConversationPhase.Development: return ProceduralReplyEngine.DialogueIntent.Theory;
-            case ConversationPhase.Complication: return ProceduralReplyEngine.DialogueIntent.Challenge;
-            case ConversationPhase.Climax: return ProceduralReplyEngine.DialogueIntent.Fear;
-            case ConversationPhase.Resolution: return ProceduralReplyEngine.DialogueIntent.Statement;
-            default: return ProceduralReplyEngine.DialogueIntent.Reply;
+            case ConversationPhase.Introduction:
+                return ProceduralReplyEngine.DialogueIntent.Question;
+            case ConversationPhase.Development:
+                return ProceduralReplyEngine.DialogueIntent.Theory;
+            case ConversationPhase.Complication:
+                return ProceduralReplyEngine.DialogueIntent.Challenge;
+            case ConversationPhase.Climax:
+                return ProceduralReplyEngine.DialogueIntent.Fear;
+            case ConversationPhase.Resolution:
+                return ProceduralReplyEngine.DialogueIntent.Statement;
+            default:
+                return ProceduralReplyEngine.DialogueIntent.Reply;
         }
     }
 }

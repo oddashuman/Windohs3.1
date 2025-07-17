@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using UnityEngine;
+using System.Linq;
 
 public class TopicManager : MonoBehaviour
 {
     public static TopicManager Instance;
 
-    // All session topics by ID (core string for now)
     public Dictionary<string, Topic> allTopics = new Dictionary<string, Topic>();
     private List<string> topicPool = new List<string>
     {
@@ -15,13 +15,11 @@ public class TopicManager : MonoBehaviour
         "prime anomaly", "rogue signal", "cascade failure", "identity fracture", "vanishing user"
     };
 
-    // Topic mutation templates
     private string[] mutations = {
         "corrupted {0}", "forbidden {0}", "recursive {0}", "anomalous {0}",
         "latent {0}", "fragmented {0}", "encrypted {0}", "leaked {0}", "spreading {0}", "debunked {0}"
     };
 
-    // Topic relationships (manually seeded and procedurally extended)
     private Dictionary<string, List<string>> relatedMap = new Dictionary<string, List<string>>();
 
     void Awake()
@@ -31,13 +29,11 @@ public class TopicManager : MonoBehaviour
         else
             Instance = this;
 
-        // Seed initial topics
         foreach (string core in topicPool)
         {
             allTopics[core] = new Topic(core);
         }
 
-        // Establish some base relationships (expand or mutate over time)
         AddRelated("observer protocol", "loop theory");
         AddRelated("loop theory", "system reset");
         AddRelated("signal leak", "protocol leak");
@@ -55,7 +51,6 @@ public class TopicManager : MonoBehaviour
         if (!relatedMap[b].Contains(a)) relatedMap[b].Add(a);
     }
 
-    // Get or create a topic by core name
     public Topic GetOrCreateTopic(string core)
     {
         if (!allTopics.ContainsKey(core))
@@ -63,14 +58,12 @@ public class TopicManager : MonoBehaviour
         return allTopics[core];
     }
 
-    // Returns a random topic (for new threads or escalation)
     public Topic GetRandomTopic()
     {
         string core = topicPool[Random.Range(0, topicPool.Count)];
         return GetOrCreateTopic(core);
     }
 
-    // Returns a random topic related to the input (or a random new one if none)
     public Topic GetRelatedTopic(Topic input)
     {
         if (input == null || !relatedMap.ContainsKey(input.core) || relatedMap[input.core].Count == 0)
@@ -81,24 +74,19 @@ public class TopicManager : MonoBehaviour
         return GetOrCreateTopic(core);
     }
 
-    // Mutate a topic (produces a new variant and optionally marks as rumor/controversial/forbidden)
     public Topic MutateTopic(Topic baseTopic)
     {
         if (baseTopic == null) return GetRandomTopic();
-        // 30% chance to just escalate to a related topic
         if (Random.value < 0.3f)
             return GetRelatedTopic(baseTopic);
 
-        // Otherwise mutate the topic (corrupted, forbidden, recursive, etc)
         string template = mutations[Random.Range(0, mutations.Length)];
         string newVariant = string.Format(template, baseTopic.core);
 
-        // If already mutated, escalate controversy
         if (baseTopic.status == TopicStatus.Mutating)
         {
             baseTopic.status = TopicStatus.Controversial;
         }
-        // 10% chance to become forbidden or rumor
         if (Random.value < 0.10f)
         {
             baseTopic.status = TopicStatus.Forbidden;
@@ -112,24 +100,23 @@ public class TopicManager : MonoBehaviour
             baseTopic.isGlitchSource = true;
         }
 
-        // Actually mutate
         baseTopic.Mutate(newVariant);
         return baseTopic;
     }
 
-    // Returns a controversial or forbidden topic for rare events
     public Topic GetControversialOrForbidden()
     {
-        foreach (var topic in allTopics.Values)
+        var controversialTopics = allTopics.Values.Where(t => t.status == TopicStatus.Controversial || t.status == TopicStatus.Forbidden).ToList();
+        if (controversialTopics.Any())
         {
-            if (topic.status == TopicStatus.Controversial || topic.status == TopicStatus.Forbidden)
-                return topic;
+            return controversialTopics[Random.Range(0, controversialTopics.Count)];
         }
-        // If none, return a mutated random topic
-        return MutateTopic(GetRandomTopic());
+        // If no controversial topics exist, create one
+        Topic topicToMutate = GetRandomTopic();
+        topicToMutate.status = TopicStatus.Controversial;
+        return topicToMutate;
     }
 
-    // Session-level rumor propagation: mark a topic as rumor
     public void MarkRumor(string core, string byCharacter = null)
     {
         var t = GetOrCreateTopic(core);
@@ -137,7 +124,6 @@ public class TopicManager : MonoBehaviour
         if (byCharacter != null) t.believers.Add(byCharacter);
     }
 
-    // Lore dump for debugging/testing
     public List<string> GetAllTopicsForDebug()
     {
         List<string> outList = new List<string>();

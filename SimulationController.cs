@@ -9,7 +9,7 @@ public class SimulationController : MonoBehaviour
 {
     public static SimulationController Instance { get; private set; }
 
-    public enum Mode { BootSequence, DesktopActivity, Terminal, Crisis, Shutdown }
+    public enum Mode { BootSequence, DesktopActivity, Terminal, PostConversation, Screensaver, Shutdown, Crisis }
 
     [Header("State")]
     public Mode currentMode = Mode.BootSequence;
@@ -21,6 +21,7 @@ public class SimulationController : MonoBehaviour
     public int minTerminalMessages = 15;
     public int maxTerminalMessages = 40;
     public float crisisModeDuration = 180f;
+    public float screensaverIdleTime = 120f;
 
     [Header("Debug")]
     public bool debugMode = false;
@@ -35,6 +36,7 @@ public class SimulationController : MonoBehaviour
     private int terminalMessageCount;
     private bool isTransitioning = false;
     private bool componentsReady = false;
+    private float lastActivityTime;
 
     void Awake()
     {
@@ -42,28 +44,23 @@ public class SimulationController : MonoBehaviour
         Instance = this;
     }
 
-    void Start()
-    {
-        StartCoroutine(InitializeAndBegin());
-    }
-    
     public IEnumerator InitializeAndBegin()
     {
-        yield return new WaitUntil(() => 
+        yield return new WaitUntil(() =>
             Windows31DesktopManager.Instance != null && Windows31DesktopManager.Instance.IsReady() &&
-            MatrixTerminalManager.Instance != null && MatrixTerminalManager.Instance.IsReady() && 
+            MatrixTerminalManager.Instance != null && MatrixTerminalManager.Instance.IsReady() &&
             DesktopAI.Instance != null
         );
 
         desktopManager = Windows31DesktopManager.Instance;
         terminalManager = MatrixTerminalManager.Instance;
         desktopAI = DesktopAI.Instance;
-        
+
         componentsReady = true;
         Debug.Log("SIMCTRL: All components linked. Starting experience flow.");
         EnterState(skipBootSequence ? Mode.DesktopActivity : Mode.BootSequence);
     }
-    
+
     public bool IsReady()
     {
         return componentsReady;
@@ -72,21 +69,28 @@ public class SimulationController : MonoBehaviour
     void Update()
     {
         if (isTransitioning || !componentsReady) return;
-        
-        switch(currentMode)
+
+        switch (currentMode)
         {
+            case Mode.DesktopActivity:
+            case Mode.PostConversation:
+                if (Time.time - lastActivityTime > screensaverIdleTime)
+                {
+                    StartCoroutine(TransitionTo(Mode.Screensaver));
+                }
+                break;
             case Mode.Terminal:
-                if (terminalMessageCount >= maxTerminalMessages) 
+                if (terminalMessageCount >= maxTerminalMessages)
+                {
+                    StartCoroutine(TransitionTo(Mode.PostConversation));
+                }
+                break;
+            case Mode.Crisis:
+                if (Time.time - phaseStartTime > crisisModeDuration)
                 {
                     StartCoroutine(TransitionTo(Mode.DesktopActivity));
                 }
                 break;
-            case Mode.Crisis:
-                 if (Time.time - phaseStartTime > crisisModeDuration)
-                 {
-                    StartCoroutine(TransitionTo(Mode.DesktopActivity));
-                 }
-                 break;
         }
     }
 
@@ -94,6 +98,7 @@ public class SimulationController : MonoBehaviour
     {
         currentMode = newState;
         phaseStartTime = Time.time;
+        lastActivityTime = Time.time;
         Debug.Log($"SIMCTRL: Entering State -> {newState}");
 
         switch (newState)
@@ -101,15 +106,29 @@ public class SimulationController : MonoBehaviour
             case Mode.BootSequence:
                 desktopManager.StartBootSequence();
                 terminalManager.DisableTerminal();
+                desktopManager.SetScreensaver(false);
                 break;
             case Mode.DesktopActivity:
                 terminalMessageCount = 0;
                 terminalManager.DisableTerminal();
-                StartCoroutine(SimulateDesktopWorkAndTransition());
+                desktopManager.SetScreensaver(false);
+                StartCoroutine(SimulateDesktopWork());
                 break;
             case Mode.Terminal:
                 terminalMessageCount = 0;
                 desktopManager.LaunchProgram(Windows31DesktopManager.ProgramType.Terminal);
+                desktopManager.SetScreensaver(false);
+                break;
+            case Mode.PostConversation:
+                terminalManager.DisableTerminal();
+                desktopManager.SetScreensaver(false);
+                StartCoroutine(SimulatePostConversationWork());
+                break;
+            case Mode.Screensaver:
+                desktopManager.SetScreensaver(true);
+                break;
+            case Mode.Shutdown:
+                StartCoroutine(ShutdownAndRestart());
                 break;
             case Mode.Crisis:
                 if (NarrativeTriggerManager.Instance != null) NarrativeTriggerManager.Instance.TriggerEvent("CrisisStart", "SimulationController");
@@ -127,20 +146,53 @@ public class SimulationController : MonoBehaviour
         isTransitioning = false;
     }
 
-    private IEnumerator SimulateDesktopWorkAndTransition()
+    private IEnumerator SimulateDesktopWork()
     {
         yield return new WaitForSeconds(3.0f);
         desktopAI.PerformActivity(Windows31DesktopManager.DesktopActivity.OrganizingFiles);
         yield return new WaitUntil(() => !desktopAI.isBusy);
-        desktopAI.PerformActivity(Windows31DesktopManager.DesktopActivity.Playing);
+        lastActivityTime = Time.time;
+
+        yield return new WaitForSeconds(Random.Range(10f, 20f));
+        desktopAI.PerformActivity(Windows31DesktopManager.DesktopActivity.ReviewingNotes);
         yield return new WaitUntil(() => !desktopAI.isBusy);
+        lastActivityTime = Time.time;
+
         Debug.Log("SIMCTRL: Orion has finished his tasks. Preparing to connect to terminal.");
         StartCoroutine(TransitionTo(Mode.Terminal));
     }
-    
+
+    private IEnumerator SimulatePostConversationWork()
+    {
+        yield return new WaitForSeconds(3.0f);
+        desktopAI.PerformActivity(Windows31DesktopManager.DesktopActivity.Playing);
+        yield return new WaitUntil(() => !desktopAI.isBusy);
+        lastActivityTime = Time.time;
+
+        Debug.Log("SIMCTRL: Orion is done playing. Shutting down.");
+        StartCoroutine(TransitionTo(Mode.Shutdown));
+    }
+
+    private IEnumerator ShutdownAndRestart()
+    {
+        // Add a shutdown sequence here if you want one
+        Debug.Log("SIMCTRL: Shutting down and restarting the loop.");
+        yield return new WaitForSeconds(5.0f);
+        ForceSessionReset();
+    }
+
     public void OnBootComplete()
     {
         if (currentMode == Mode.BootSequence)
+        {
+            StartCoroutine(TransitionTo(Mode.DesktopActivity));
+        }
+    }
+
+    public void ReportActivity()
+    {
+        lastActivityTime = Time.time;
+        if (currentMode == Mode.Screensaver)
         {
             StartCoroutine(TransitionTo(Mode.DesktopActivity));
         }
@@ -152,20 +204,15 @@ public class SimulationController : MonoBehaviour
     {
         if (currentMode != Mode.Crisis) StartCoroutine(TransitionTo(Mode.Crisis));
     }
-    
-    /// <summary>
-    /// // FIX: Restored this public method required by SimpleNeuralCascadeIntegration for debugging.
-    /// </summary>
+
     public void ForceSessionReset()
     {
         Debug.Log("SIMCTRL: Forcing session reset!");
-        // This should ideally reload the scene or reset all relevant managers.
-        // For now, we'll just restart the initialization sequence.
+        if (DialogueState.Instance != null) DialogueState.Instance.Reset();
         StopAllCoroutines();
         componentsReady = false;
-        StartCoroutine(InitializeAndBegin());
+        UnityEngine.SceneManagement.SceneManager.LoadScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
     }
 
-    // For Debugging
-    public string GetDebugInfo() => $"Mode: {currentMode}, Messages: {terminalMessageCount}/{maxTerminalMessages}";
+    public string GetDebugInfo() => $"Mode: {currentMode}, Time in Phase: {Time.time - phaseStartTime:F1}s, Messages: {terminalMessageCount}/{maxTerminalMessages}";
 }

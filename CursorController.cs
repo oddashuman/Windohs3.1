@@ -11,6 +11,7 @@ public class CursorController : MonoBehaviour
     public Texture2D[] cursorTextures;
     private RectTransform cursorRect;
     private Image cursorImage;
+    private Canvas cursorCanvas;
 
     [Header("Movement Physics")]
     public float baseSpeed = 800f;
@@ -43,11 +44,11 @@ public class CursorController : MonoBehaviour
     {
         GameObject cursorGO = new GameObject("OrionsCursor");
         cursorGO.transform.SetParent(transform, false);
-        Canvas cursorCanvas = cursorGO.AddComponent<Canvas>();
+        cursorCanvas = cursorGO.AddComponent<Canvas>();
         cursorCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
         cursorCanvas.sortingOrder = 10000;
 
-        cursorRect = cursorGO.GetComponent<RectTransform>(); 
+        cursorRect = cursorGO.GetComponent<RectTransform>();
         cursorRect.sizeDelta = new Vector2(32, 32);
         cursorRect.pivot = new Vector2(0, 1);
 
@@ -70,6 +71,7 @@ public class CursorController : MonoBehaviour
         yield return StartCoroutine(ExecuteRealisticMovement(target));
         yield return StartCoroutine(PerformClick(false));
         isMoving = false;
+        SimulationController.Instance.ReportActivity();
     }
 
     public IEnumerator MoveToAndDoubleClick(Vector2 target, string mood = "casual")
@@ -81,6 +83,7 @@ public class CursorController : MonoBehaviour
         yield return new WaitForSeconds(Random.Range(0.05f, 0.1f));
         yield return StartCoroutine(PerformClick(true)); // Second click
         isMoving = false;
+        SimulationController.Instance.ReportActivity();
     }
 
     public IEnumerator MoveAndDrag(Vector2 startHandle, Vector2 dragVector)
@@ -90,6 +93,7 @@ public class CursorController : MonoBehaviour
         Vector2 endPosition = startHandle + dragVector;
         yield return StartCoroutine(ExecuteRealisticMovement(endPosition, true));
         isMoving = false;
+        SimulationController.Instance.ReportActivity();
     }
 
     private void SetMood(string mood)
@@ -137,13 +141,13 @@ public class CursorController : MonoBehaviour
             cursorRect.position = currentPosition;
         }
     }
-    
+
     private IEnumerator PerformClick(bool isDoubleClick)
     {
         Windows31DesktopManager.Instance.PlaySound(isDoubleClick ? "doubleclick" : "click");
         yield return new WaitForSeconds(0.1f);
     }
-    
+
     public void MoveTo(Vector2 target, bool immediate)
     {
          if(immediate)
@@ -162,7 +166,15 @@ public class CursorController : MonoBehaviour
     }
 
     public Vector2 GetCurrentPosition() => currentPosition;
-    
+
+    public void SetVisibility(bool isVisible)
+    {
+        if (cursorCanvas != null)
+        {
+            cursorCanvas.gameObject.SetActive(isVisible);
+        }
+    }
+
     public bool IsMoving() => isMoving;
     public void StartIdleMovement() { /* TODO */ }
     public void SetPrecisionMode(bool precision) { /* TODO */ }
