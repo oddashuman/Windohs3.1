@@ -2,6 +2,9 @@ using UnityEngine;
 using System.Collections;
 using TMPro;
 
+/// <summary>
+/// Fixed integration script with proper access to enhanced systems
+/// </summary>
 public class SimpleNeuralCascadeIntegration : MonoBehaviour
 {
     [Header("Setup Configuration")]
@@ -33,32 +36,58 @@ public class SimpleNeuralCascadeIntegration : MonoBehaviour
     public void LogSystemStatus()
     {
         Debug.Log("=== SYSTEM STATUS ===");
-        if (CursorController.Instance != null) Debug.Log($"Cursor: Pos {CursorController.Instance.GetCurrentPosition()}, Moving: {CursorController.Instance.isMoving}");
-        if (Windows31DesktopManager.Instance != null) Debug.Log($"Desktop: {Windows31DesktopManager.Instance.GetDebugInfo()}");
-        if (SimulationController.Instance != null) Debug.Log($"Simulation: {SimulationController.Instance.GetDebugInfo()}");
-        if (DialogueState.Instance != null) Debug.Log($"Dialogue State - Tension: {DialogueState.Instance.globalTension:F2}, Awareness: {DialogueState.Instance.metaAwareness:F2}");
+        
+        // Safe cursor access
+        if (CursorController.Instance != null) 
+        {
+            Debug.Log($"Cursor: Pos {CursorController.Instance.GetCurrentPosition()}, Moving: {CursorController.Instance.IsMoving()}");
+        }
+        
+        if (Windows31DesktopManager.Instance != null) 
+        {
+            Debug.Log($"Desktop: {Windows31DesktopManager.Instance.GetDebugInfo()}");
+        }
+        
+        if (SimulationController.Instance != null) 
+        {
+            Debug.Log($"Simulation: {SimulationController.Instance.GetDebugInfo()}");
+        }
+        
+        if (DialogueState.Instance != null) 
+        {
+            Debug.Log($"Dialogue State - Tension: {DialogueState.Instance.globalTension:F2}, Awareness: {DialogueState.Instance.metaAwareness:F2}");
+        }
     }
 
     public void ForceDesktopMode()
     {
         Debug.Log("Forcing desktop mode");
-        if (Windows31DesktopManager.Instance != null) { /* desktop has no ShowDesktop() */ }
-        if (MatrixTerminalManager.Instance != null) MatrixTerminalManager.Instance.DisableTerminal();
-        if (CursorController.Instance != null) { /* cursor has no StartIdleMovement() */ }
+        
+        if (MatrixTerminalManager.Instance != null) 
+            MatrixTerminalManager.Instance.DisableTerminal();
+        
+        if (CursorController.Instance != null) 
+            CursorController.Instance.SetVisibility(true);
     }
 
     public void ForceTerminalMode()
     {
         Debug.Log("Forcing terminal mode");
-        if (Windows31DesktopManager.Instance != null) { /* desktop has no TriggerConversationMode() */ }
-        if (MatrixTerminalManager.Instance != null) MatrixTerminalManager.Instance.EnableTerminal();
-        if (CursorController.Instance != null) { /* cursor has no SetPrecisionMode() */ }
+        
+        if (Windows31DesktopManager.Instance != null) 
+            Windows31DesktopManager.Instance.LaunchProgram(Windows31DesktopManager.ProgramType.Terminal);
+        
+        if (MatrixTerminalManager.Instance != null) 
+            MatrixTerminalManager.Instance.EnableTerminal();
     }
 
     public void TriggerCrisis()
     {
         Debug.Log("Triggering crisis mode");
-        if (SimulationController.Instance != null) SimulationController.Instance.TriggerCrisisMode();
+        
+        if (SimulationController.Instance != null) 
+            SimulationController.Instance.TriggerCrisisMode();
+        
         if (DialogueState.Instance != null)
         {
             DialogueState.Instance.globalTension = 1.0f;
@@ -70,18 +99,26 @@ public class SimpleNeuralCascadeIntegration : MonoBehaviour
     public void ResetExperience()
     {
         Debug.Log("Resetting experience");
-        if (SimulationController.Instance != null) SimulationController.Instance.ForceSessionReset();
-        if (DialogueState.Instance != null) DialogueState.Instance.Reset();
-        if (CursorController.Instance != null) { /* cursor has no ResetFatigue() */ }
+        
+        if (SimulationController.Instance != null) 
+            SimulationController.Instance.ForceSessionReset();
+        
+        if (DialogueState.Instance != null) 
+            DialogueState.Instance.Reset();
+        
+        if (CursorController.Instance != null) 
+            CursorController.Instance.ResetFatigue();
     }
 
     public void InjectViewerMessage(string username, string message)
     {
-        if (DialogueEngine.Instance != null) DialogueEngine.Instance.EnqueueUserMessage(username, message);
+        if (DialogueEngine.Instance != null) 
+            DialogueEngine.Instance.EnqueueUserMessage(username, message);
     }
 
     public void SetDesktopActivity(Windows31DesktopManager.DesktopActivity activity)
     {
-        if (Windows31DesktopManager.Instance != null) Windows31DesktopManager.Instance.BeginActivity(activity);
+        if (Windows31DesktopManager.Instance != null) 
+            Windows31DesktopManager.Instance.BeginActivity(activity);
     }
 }
